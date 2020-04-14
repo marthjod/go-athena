@@ -12,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/athena"
+	"github.com/jmoiron/sqlx"
 )
 
 var (
@@ -108,6 +109,31 @@ func Open(cfg Config) (*sql.DB, error) {
 
 	sql.Register(name, &Driver{&cfg})
 	return sql.Open(name, "")
+}
+
+// Openx is the sqlx version of `db.Open`.
+func Openx(cfg Config) (*sqlx.DB, error) {
+	if cfg.Database == "" {
+		return nil, errors.New("db is required")
+	}
+
+	// if cfg.OutputLocation == "" {
+	// 	return nil, errors.New("s3_staging_url is required")
+	// }
+
+	// if cfg.Session == nil {
+	// 	return nil, errors.New("session is required")
+	// }
+
+	// This hack was copied from jackc/pgx. Sorry :(
+	// https://github.com/jackc/pgx/blob/70a284f4f33a9cc28fd1223f6b83fb00deecfe33/stdlib/sql.go#L130-L136
+	openFromSessionMutex.Lock()
+	openFromSessionCount++
+	name := fmt.Sprintf("athena-%d", openFromSessionCount)
+	openFromSessionMutex.Unlock()
+
+	// sqlx.Register(name, &Driver{&cfg})
+	return sqlx.Open(name, cfg.Database)
 }
 
 // Config is the input to Open().
